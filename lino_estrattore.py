@@ -12,7 +12,7 @@ from google.genai.errors import APIError
 
 # --- CONFIGURAZIONE E STILE ---
 
-# L'impostazione "centered" qui è cruciale per i contenuti principali, ma non per il logo
+# L'impostazione "centered" è cruciale per i contenuti principali.
 st.set_page_config(page_title="📋 Lino Estrattore AI (Gemini)", layout="centered")
 
 # --- RECUPERO CHIAVI API (come prima) ---
@@ -25,10 +25,6 @@ except (KeyError, Exception):
 
 # --- FUNZIONE DI ESTRAZIONE AI (estrai_dettagli_con_gemini) (omessa per brevità, resta IDENTICA) ---
 # ... (Inserisci qui la funzione estrai_dettagli_con_gemini completa) ...
-
-# --------------------------------------------------------------------------------------
-# ---------------------------------- INIZIO DEL CODICE ---------------------------------
-# --------------------------------------------------------------------------------------
 
 # --- FUNZIONE PER ESTRARRE TESTO DAL PDF (omessa per brevità) ---
 def estrai_testo_da_pdf(pdf_file_obj):
@@ -43,30 +39,33 @@ def estrai_testo_da_pdf(pdf_file_obj):
         st.error(f"❌ Errore durante la lettura del PDF: {type(e).__name__}. Il file potrebbe essere protetto o corrotto.")
         return None
 
+
 # --- INTERFACCIA STREAMLIT (Frontend) ---
 
-# --- LOGO E TITOLO CENTRATI ---
-# Creiamo due colonne per l'allineamento. Lo slot centrale (vuoto) simula la centralità.
-col_left, col_logo, col_title, col_right = st.columns([1, 1, 4, 1])
+# --- LOGO E TITOLO CENTRATI E PIÙ GRANDI ---
+
+# Usiamo 5 colonne: 1 e 5 sono vuote (margine), 2 e 4 sono per il contenuto.
+col_left_margin, col_logo, col_title, col_right_margin = st.columns([1, 1.5, 5, 1.5]) 
 
 with col_logo:
     try:
-        # Immagine di piccole dimensioni
-        st.image("logo_amel.png", width=70) 
+        # Aumento la dimensione del logo (da 70 a 100)
+        st.image("logo_amel.png", width=100) 
     except FileNotFoundError:
         pass
 
 with col_title:
-    # Ridotto a subheader per un look più pulito, o lasciato titolo se preferisci
-    st.header("Lino Estrattore AI")
+    # Aggiungo di nuovo l'emoji e uso il titolo principale
+    st.title("📋 Lino Bandi 2 - L'Estrattore")
 
 st.markdown("---")
 
 # Spiegazione e Promemoria (Centrato e compatto)
 st.markdown("""
 <div style='text-align: center;'>
-    Questa applicazione utilizza l'AI di **Gemini 2.5 Flash** per un'estrazione dati estremamente accurata dai PDF.<br>
-    L'uso rientra nel piano gratuito (Free Tier) per un utilizzo normale.
+    Ciao Lino Bandi ti da nuovamente il benvenuto e vuole aiutarti a fare una rapida sintesi dei bandi che hai trovato!
+    Caricane massimo 5 in PDF e scarica il file! Troverai tutte le info necessarie per capire di che si tratta e decidere i prossimi passi.
+    L'applicazione si appoggia sul sistema Gemini AI Flash 2.5 e pertanto può commettere errori.
 </div>
 """, unsafe_allow_html=True)
 st.markdown("---")
@@ -78,11 +77,10 @@ if 'filename_output' not in st.session_state:
     st.session_state['filename_output'] = f'Sintesi_Bandi_AI_{datetime.now().strftime("%Y%m%d")}'
 
 # 2. Form per Upload e Aggiunta
-# Usiamo un container per limitare la larghezza del form (solo testo, non codice)
+# Usiamo un container per limitare la larghezza del form e mantenere la sensazione di compattezza
 with st.container(border=True):
     st.subheader("Aggiungi i File PDF per l'Analisi (Max 5)")
     
-    # ... (Il resto del codice del form di upload e clear) ...
     uploaded_file = st.file_uploader(
         "Carica un file PDF:", 
         type="pdf", 
@@ -92,7 +90,7 @@ with st.container(border=True):
 
     col1, col2 = st.columns([1, 1])
     with col1:
-        add_button = st.button("➕ Aggiungi File all'Analisi", key="add_btn") # Modificato in st.button fuori dal form per chiarezza
+        add_button = st.button("➕ Aggiungi File all'Analisi", key="add_btn") 
     with col2:
         clear_button = st.button("❌ Rimuovi TUTTI i File", key="clear_btn")
 
@@ -129,7 +127,6 @@ filename_input = st.text_input(
 
 if st.button("▶️ ESTRAI e GENERA REPORT EXCEL con AI", type="primary", disabled=(len(st.session_state['uploaded_pdfs']) == 0)):
     
-    # ... (Il resto della logica di estrazione e download, come prima) ...
     if not st.session_state['uploaded_pdfs']:
         st.error("Carica almeno un file PDF per procedere.")
         st.stop()
@@ -182,4 +179,3 @@ if st.button("▶️ ESTRAI e GENERA REPORT EXCEL con AI", type="primary", disab
         )
     else:
         st.error("⚠️ Nessun dato è stato estratto con successo.")
-
