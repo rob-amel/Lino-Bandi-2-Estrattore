@@ -140,7 +140,7 @@ def estrai_testo_da_pdf(pdf_file_obj):
 col_logo, col_title = st.columns([1, 4])
 with col_logo:
     try:
-        st.image("logo_amelia.png", width=80) 
+        st.image("logo_amel.png", width=80) 
     except FileNotFoundError:
         st.markdown(" ") # Placeholder per mantenere l'allineamento
 with col_title:
@@ -266,3 +266,4 @@ if st.button("▶️ ESTRAI e GENERA REPORT EXCEL con AI", type="primary", disab
         )
     else:
         st.error("⚠️ Nessun dato è stato estratto con successo.")
+
