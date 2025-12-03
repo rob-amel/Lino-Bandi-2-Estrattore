@@ -178,7 +178,7 @@ def estrai_testo_da_pdf(pdf_file_obj):
 
 st.set_page_config(page_title="📋 Lino Estrattore Multi-Bando", layout="wide")
 
-st.title("📋 Lino Estrattore Multi-Bando (Analisi PDF Gratuita)")
+st.title("📋 Lino Bandi 2 - L'Estrattore")
 
 st.markdown("""
 Carica fino a **5 file PDF** (uno per volta) e l'applicazione estrarrà le informazioni chiave basandosi su regole di testo avanzate e le sintetizzerà in un file Excel unico.
@@ -304,4 +304,5 @@ if st.button("▶️ ESTRAI e GENERATE REPORT EXCEL", type="primary", disabled=(
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     else:
+
         st.error("⚠️ Nessun dato è stato estratto correttamente. Controlla i file PDF.")
