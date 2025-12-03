@@ -4,3 +4,4 @@ pypdf
 beautifulsoup4
 requests
 xlsxwriter
+google-genai
