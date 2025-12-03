@@ -52,7 +52,7 @@ col_left, col_logo, col_title, col_right = st.columns([1, 1, 4, 1])
 with col_logo:
     try:
         # Immagine di piccole dimensioni
-        st.image("logo_amelia.png", width=70) 
+        st.image("logo_amel.png", width=70) 
     except FileNotFoundError:
         pass
 
@@ -182,3 +182,4 @@ if st.button("▶️ ESTRAI e GENERA REPORT EXCEL con AI", type="primary", disab
         )
     else:
         st.error("⚠️ Nessun dato è stato estratto con successo.")
+
