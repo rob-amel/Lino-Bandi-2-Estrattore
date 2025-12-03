@@ -187,7 +187,7 @@ try:
 except FileNotFoundError:
     st.warning("⚠️ Logo 'logo_amel.png' non trovato. Assicurati che sia nella cartella principale.")
 
-st.title("📋 Lino Estrattore Multi-Bando")
+st.title("📋 Lino Bandi 2 - L'Estrattore")
 st.markdown("---")
 
 st.markdown("""
@@ -322,5 +322,6 @@ if st.button("▶️ ESTRAI e GENERA REPORT EXCEL", type="primary", disabled=(le
         except FileNotFoundError:
             pass
         st.error("⚠️ Nessun dato è stato estratto correttamente. Controlla i file PDF.")
+
 
 
