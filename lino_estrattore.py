@@ -139,7 +139,7 @@ col_logo, col_title = st.columns([1.5, 5])
 
 with col_logo:
     try:
-        st.image("logo_amelia.png", width=100) 
+        st.image("logo_amel.png", width=100) 
     except FileNotFoundError:
         pass # Lasciamo il logo mancante, ma il resto funziona
 
@@ -275,3 +275,4 @@ if st.button("▶️ ESTRAI e GENERA REPORT EXCEL con AI", type="primary", disab
     else:
         # Questo errore significa che NESSUNA chiamata API ha avuto successo.
         st.error("⚠️ Nessun dato è stato estratto con successo. Controlla la chiave API e i log dell'app.")
+
