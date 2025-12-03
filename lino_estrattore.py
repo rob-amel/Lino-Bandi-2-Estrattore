@@ -3,21 +3,25 @@ import pandas as pd
 import re
 from datetime import datetime
 from io import BytesIO 
-from pypdf import PdfReader # Libreria per la lettura dei PDF
+from pypdf import PdfReader 
+import numpy as np # Importiamo numpy per gestire NaN
+
+# --- CONFIGURAZIONE E STILE ---
+
+st.set_page_config(page_title="📋 Lino Estrattore Multi-Bando", layout="centered")
 
 # --- FUNZIONE DI ANALISI DEL TESTO AVANZATA (CORE DEL BOT) ---
 
 def estrai_dettagli_da_testo_grezzo(testo_bando, file_name):
     """
     Analizza il testo grezzo di un bando usando espressioni regolari e liste di parole chiave
-    per estrarre informazioni strutturate nella nuova lista dettagliata.
+    per estrarre informazioni strutturate.
     """
     
-    # Inizializzazione del dizionario dei risultati
-    # Tutti i campi sono inizializzati a 'NA'
+    # Inizializzazione del dizionario dei risultati con campi ordinati
     risultati = {
-        "Titolo bando": file_name.replace(".pdf", "").replace("_", " ").title(),
         "Categoria": "NA",
+        "Titolo bando": file_name.replace(".pdf", "").replace("_", " ").title(),
         "Donatore": "NA",
         "Totale finanziamento": "NA",
         "Importo max per proposta": "NA",
@@ -38,126 +42,127 @@ def estrai_dettagli_da_testo_grezzo(testo_bando, file_name):
     
     text = testo_bando.lower()
     
-    # Liste estese di parole chiave (per migliorare l'estrazione RegEx)
-    
     # ----------------------------------------------------
     # 1. ESTRAZIONE DATI NUMERICI E TEMPORALI (REGULAR EXPRESSIONS)
     # ----------------------------------------------------
     
-    # -- Deadline --
+    # -- Deadline -- (Più robusta: cerca anche "entro il" o "data limite")
     mesi_it_en = r'(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|january|february|march|april|may|june|july|august|september|october|november|december)'
-    date_pattern = rf'(scadenza|deadline|termine|data di chiusura)[^a-z]*(\d{{1,2}}[\/\-\.]\d{{1,2}}[\/\-\.]\d{{2,4}}|\d{{1,2}}\s{mesi_it_en}\s\d{{2,4}}|\d{{4}}[\-\/]\d{{1,2}}[\-\/]\d{{1,2}})'
+    date_pattern = rf'(scadenza|deadline|termine|chiusura|data limite|entro il)[:\s]*(.*?)(\d{{1,2}}[\/\-\.]\d{{1,2}}[\/\-\.]\d{{2,4}}|\d{{1,2}}\s{mesi_it_en}\s\d{{2,4}}|\d{{4}}[\-\/]\d{{1,2}}[\-\/]\d{{1,2}})'
     date_matches = re.search(date_pattern, text, re.IGNORECASE)
     if date_matches:
-        risultati["Deadline presentazione proposta"] = date_matches.group(2).strip() 
+        # Prende il gruppo di cattura 3 (la data pulita)
+        risultati["Deadline presentazione proposta"] = date_matches.group(3).strip() 
 
-    # -- Importo Max per Proposta / Totale Finanziamento (simil-RegEx per numeri) --
+    # -- Importo Max per Proposta / Totale Finanziamento --
     
-    # Pattern più generale per catturare numeri grandi con valute (€, $, CHF, GBP, Euro)
-    amount_pattern = r'(\d{{1,3}}(?:[,\.]\d{{3}})*(?:[,\.]\d{{1,2}})?)\s*(€|euro|EUR|milioni|\$|USD|CHF|GBP)'
+    # Pattern: cerca numeri con separatori (., o ,) seguiti da valuta.
+    amount_pattern = r'(\$|€|euro|EUR|CHF|GBP)\s*(\d{{1,3}}[,\.]\d{{3}}(?:[,\.]\d{{3}})*(?:[,\.]\d{{1,2}})?|\d{{1,3}}(?:[,\.]\d{{3}})*(?:[,\.]\d{{1,2}})?)\s*(milioni)?'
     amount_matches = re.findall(amount_pattern, text, re.IGNORECASE)
 
     if amount_matches:
-        # Tenta di identificare l'importo massimo, spesso è il più grande o il primo significativo
-        # Questo è un tentativo euristico, non garantito.
+        # La logica per distinguere Totale e Max è euristica. Usiamo il primo trovato per Max e il secondo per Totale.
         
-        # Converte i risultati in numeri per confronto
-        numeric_amounts = []
-        for val, currency in amount_matches:
-            # Pulisce i separatori di migliaia e decimali (gestione euristica IT/EN)
-            cleaned_val = val.replace('.', '').replace(',', '') # Togli tutti i separatori inizialmente
-            
-            # Se ha una virgola, trattala come decimale IT
-            if ',' in val:
-                 cleaned_val = val.replace('.', '').replace(',', '.') # Es: 1.000,00 -> 1000.00
-            # Se ha un punto come decimale, rimuovi le virgole
-            elif '.' in val and len(val.split('.')[-1]) == 2:
-                 pass # Lascia com'è (formato EN)
-                 
-            try:
-                numeric_amounts.append(float(cleaned_val))
-            except ValueError:
-                continue
+        # Funzione helper per formattare il valore
+        def format_amount(match_tuple):
+            currency = match_tuple[0]
+            value = match_tuple[1].replace('.', 'XXX').replace(',', '.').replace('XXX', ',') # Inverte separatori IT/EN per uniformità
+            milioni = match_tuple[2]
+            return f"{currency} {value}{' Milioni' if milioni else ''}"
 
-        # Se ci sono importi significativi, assegna i primi trovati
-        if len(amount_matches) > 0:
-            valore = amount_matches[0][0].replace('.', '_').replace(',', '.').replace('_', ',')
-            simbolo = amount_matches[0][1]
-            risultati["Importo max per proposta"] = f"Max {valore} {simbolo}"
+        if len(amount_matches) >= 1:
+            risultati["Importo max per proposta"] = format_amount(amount_matches[0])
         
-        if len(amount_matches) > 1:
-            valore = amount_matches[1][0].replace('.', '_').replace(',', '.').replace('_', ',')
-            simbolo = amount_matches[1][1]
-            risultati["Totale finanziamento"] = f"Totale {valore} {simbolo}"
-            
-    # -- Durata (es: 12 mesi, 1-3 anni) --
+        if len(amount_matches) >= 2:
+             risultati["Totale finanziamento"] = format_amount(amount_matches[1])
+
+    # -- Durata --
     durata_pattern = r'(durata (del progetto)?|periodo di attuazione)[:\s]*(\d{1,2}[\s\-\/]\d{1,2}|fino a \d{1,2}|massimo \d{1,2})\s*(mesi|anni)'
     durata_matches = re.search(durata_pattern, text, re.IGNORECASE)
     if durata_matches:
         risultati["Durata min/max progetti"] = durata_matches.group(3).strip() + " " + durata_matches.group(4)
         
     # ----------------------------------------------------
-    # 2. ESTRAZIONE BASATA SU PAROLE CHIAVE (SETTORE, AREA, CONSORZIO, CO-FIN)
+    # 2. ESTRAZIONE BASATA SU PAROLE CHIAVE (BOOSTER DI PRECISIONE)
     # ----------------------------------------------------
 
-    # Liste dei donatori più comuni (euristica)
-    KEY_DONATORI = ['european union', 'commissione europea', 'fondazione cariplo', 'fondazione crt', 'fondazione cdp', 'unhcr', 'unicef', 'usaid', 'aics', 'ministero degli affari esteri']
-
-    # Cerca co-finanziamento e partenariato/consorzio
-    if any(k in text for k in ['co-finanziamento', 'cofinanziamento', 'co-funding']):
-        risultati["Co-finanziamento previsto"] = "Sì (Cercare %)"
+    # Liste dei donatori più comuni (euristica estesa)
+    KEY_DONATORI = ['european union', 'commissione europea', 'fondazione cariplo', 'fondazione crt', 'fondazione cdp', 'unhcr', 'unicef', 'usaid', 'aics', 'ministero degli affari esteri', 'onu', 'undp', 'unep', 'fondazione con il sud', 'bandi inps']
     
-    if any(k in text for k in ['consorzio', 'ats', 'associazione temporanea di scopo', 'partenariato', 'partnership', 'joint application']):
-        risultati["Consorzio/ATS/partenariato"] = "Obbligatorio/Ammesso"
+    # Co-finanziamento e Partenariato
+    if any(k in text for k in ['co-finanziamento', 'cofinanziamento', 'co-funding', 'matched funding', 'own contribution']):
+        risultati["Co-finanziamento previsto"] = "Sì (Cercare % e Tipo)"
+    
+    if any(k in text for k in ['consorzio', 'ats', 'associazione temporanea di scopo', 'partenariato', 'partnership', 'joint application', 'rete di soggetti']):
+        risultati["Consorzio/ATS/partenariato"] = "Obbligatorio/Ammesso (Cercare dettagli)"
 
-    # Area Geografica (ricerca di enti amministrativi o aree vaste)
-    KEY_GEOGRAFIA = ['regione puglia', 'lombardia', 'veneto', 'campania', 'sicilia', 'italia', 'ue', 'europa', 'global', 'nazionale']
+    # Area Geografica (più specifica)
+    KEY_GEOGRAFIA = ['regione puglia', 'lombardia', 'veneto', 'campania', 'sicilia', 'italia', 'ue', 'europa', 'global', 'nazionale', 'africa', 'balcani', 'asia']
     found_geografia = set(key.capitalize() for key in KEY_GEOGRAFIA if key in text)
     if found_geografia:
         risultati["Area di implementazione"] = "; ".join(found_geografia)
         
-    # Donatore
-    found_donatori = set(key.title() for key in KEY_DONATORI if key in text)
+    # Donatore (più robusta: cerca Donatore, non solo nel testo, ma anche come titolo)
+    found_donatori = set()
+    for key in KEY_DONATORI:
+        if key in text:
+            # Aggiunge il donatore solo se non è una keyword generica come 'ministero'
+            if len(key.split()) > 1 or 'fondazione' in key:
+                 found_donatori.add(key.title())
     if found_donatori:
         risultati["Donatore"] = "; ".join(found_donatori)
         
     # ----------------------------------------------------
-    # 3. ESTRAZIONE TESTO CONTESTUALE (più difficile senza AI)
+    # 3. ESTRAZIONE TESTO CONTESTUALE (Migliorata con Delimitatori robusti)
     # ----------------------------------------------------
     
-    # Per i campi testuali lunghi (Obiettivi, Criteri di eleggibilità, ecc.), 
-    # cerchiamo i titoli delle sezioni nel PDF e catturiamo il testo successivo
-    
-    # Euristiche per catturare il testo dopo i titoli comuni
-    def extract_section(title_list, max_chars=300):
+    TITLES_END = ['criteri', 'documentazione', 'obiettivi', 'settori', 'attività', 'gruppi target', 'tematiche trasversali', 'contatto', 'scadenza', 'deadline', 'ammontare', 'importo', 'capitolo']
+
+    def extract_section(title_list, max_chars=400):
+        """Estrae testo tra un titolo di sezione e l'inizio del successivo."""
+        
+        # Pattern di fine: cerca un numero/lettera/romano con punto, oppure una delle parole chiave TITLES_END
+        end_pattern_keywords = '|'.join(TITLES_END)
+        # Cerca: \n [Opzionale Spazi] [Numero/Lettera/Romano/Doppio Punto] [Punto] [Spazio] OPPURE una delle Keyword TITLES_END
+        end_pattern = rf'(?:\n\s*(?:\d+|[A-Z]|\d+\.\d+|[IVXLCDM]+)\.|\n\s*(?:{end_pattern_keywords}))'
+        
         for title in title_list:
-            # Cerca il titolo e cattura i successivi N caratteri o fino al prossimo titolo
-            pattern = re.escape(title) + r'[:\s]*(.*?)(\n\d\.\s|\n[A-Z]\.\s|Criteri|Documentazione|Obiettivi|Settori|$)'
+            # Pattern: (Titolo richiesto) seguito da (caratteri in modo non avido) fino a (un delimitatore di fine)
+            pattern = re.escape(title) + r'[:\s]*(.*?)' + end_pattern
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            
             if match:
                 extracted_text = match.group(1).strip()
                 # Pulizia grossolana
                 extracted_text = re.sub(r'\s+', ' ', extracted_text) 
+                extracted_text = re.sub(r'^- ', '', extracted_text).strip()
+                
                 return extracted_text[:max_chars].strip() + ("..." if len(extracted_text) > max_chars else "")
-        return "NA (Ricerca Manuale)"
+        return "NA"
 
-    risultati["Obiettivi bando / proposte"] = extract_section(['Obiettivi del Bando', 'Finalità', 'Scope', 'Goals', 'Priorità tematiche'])
-    risultati["Criteri di eleggibilità"] = extract_section(['Criteri di eleggibilità', 'Eligibility Criteria', 'Chi può partecipare', 'Requisiti dei proponenti'])
-    risultati["Documentazione richiesta"] = extract_section(['Documentazione richiesta', 'Documenti da allegare', 'Required Documents', 'Modalità di presentazione'])
-    risultati["Criteri di valutazione"] = extract_section(['Criteri di valutazione', 'Evaluation Criteria', 'Punteggio massimo', 'Metodologia di selezione'])
+    # Nuove euristiche migliorate per i campi
+    risultati["Obiettivi bando / proposte"] = extract_section(['Obiettivi del Bando', 'Finalità', 'Scope', 'Goals', 'Priorità tematiche', 'Cosa finanzia', 'oggetto del bando'])
+    risultati["Criteri di eleggibilità"] = extract_section(['Criteri di eleggibilità', 'Eligibility Criteria', 'Chi può partecipare', 'Requisiti dei proponenti', 'beneficiari ammissibili', 'soggetti ammissibili'])
+    risultati["Documentazione richiesta"] = extract_section(['Documentazione richiesta', 'Documenti da allegare', 'Required Documents', 'Modalità di presentazione', 'Annex', 'Allegati'])
+    risultati["Criteri di valutazione"] = extract_section(['Criteri di valutazione', 'Evaluation Criteria', 'Punteggio massimo', 'Metodologia di selezione', 'Selezione delle proposte'])
+    risultati["Attività previste (if any)"] = extract_section(['Attività previste', 'Actions', 'Azioni ammissibili', 'Attività ammissibili', 'spese ammissibili'])
+    risultati["Tematiche trasversali"] = extract_section(['Tematiche trasversali', 'Cross-cutting themes', 'Approccio di genere', 'Parità', 'Sostenibilità ambientale'])
+    risultati["Gruppi target"] = extract_section(['Gruppi target', 'Destinatari', 'Beneficiari diretti', 'popolazione di riferimento'])
     
     # Estrazione settori target (parole chiave raggruppate)
-    KEY_SETTORI = ['clima', 'ambiente', 'biodiversità', 'inclusione', 'sociale', 'cultura', 'migrazione', 'salute', 'energia rinnovabile']
+    KEY_SETTORI = ['clima', 'ambiente', 'biodiversità', 'inclusione', 'sociale', 'cultura', 'migrazione', 'salute', 'energia rinnovabile', 'agricoltura', 'sviluppo rurale', 'educazione']
     found_settori = set(key.capitalize() for key in KEY_SETTORI if key in text)
     if found_settori:
         risultati["Settori target"] = "; ".join(found_settori)
+        
+    # Assegna una Categoria generale
+    if 'ambiente' in text or 'clima' in text:
+        risultati["Categoria"] = "Ambientale/Clima"
+    elif 'sociale' in text or 'inclusione' in text or 'povertà' in text:
+        risultati["Categoria"] = "Sociale/Inclusione"
+    elif 'cultura' in text or 'arte' in text:
+        risultati["Categoria"] = "Culturale/Educazione"
     
-    # Gruppi target
-    KEY_GRUPPI = ['donne', 'giovani', 'minori', 'anziani', 'disabili', 'migranti', 'rifugiati', 'comunità locali', 'popolazioni vulnerabili']
-    found_gruppi = set(key.capitalize() for key in KEY_GRUPPI if key in text)
-    if found_gruppi:
-        risultati["Gruppi target"] = "; ".join(found_gruppi)
-
     return risultati
 
 # --- FUNZIONE PER ESTRARRE TESTO DAL PDF ---
@@ -171,17 +176,23 @@ def estrai_testo_da_pdf(pdf_file_obj):
             text += page.extract_text() + "\n"
         return text.strip()
     except Exception as e:
-        # Nota: L'errore è mostrato nell'interfaccia Streamlit, qui restituiamo None
+        st.error(f"❌ Errore durante la lettura del PDF: {type(e).__name__}. Il file potrebbe essere protetto o corrotto.")
         return None
 
 # --- INTERFACCIA STREAMLIT (Frontend) ---
 
-st.set_page_config(page_title="📋 Lino Estrattore Multi-Bando", layout="wide")
+# --- LOGO E TITOLO ---
+try:
+    st.image("logo_amelia.png", width=200) 
+except FileNotFoundError:
+    st.warning("⚠️ Logo 'logo_amelia.png' non trovato. Assicurati che sia nella cartella principale.")
 
-st.title("📋 Lino Bandi 2 - L'Estrattore")
+st.title("📋 Lino Estrattore Multi-Bando")
+st.markdown("---")
 
 st.markdown("""
-Carica fino a **5 file PDF** (uno per volta) e l'applicazione estrarrà le informazioni chiave basandosi su regole di testo avanzate e le sintetizzerà in un file Excel unico.
+Questa applicazione analizza il contenuto di **file PDF** o testo incollato e ne estrae le informazioni chiave in un report Excel.
+Le funzioni di estrazione sono basate su **regole di testo avanzate** per massimizzare la precisione, ma l'accuratezza dipende dalla formattazione del bando.
 """)
 st.markdown("---")
 
@@ -189,14 +200,13 @@ st.markdown("---")
 if 'uploaded_pdfs' not in st.session_state:
     st.session_state['uploaded_pdfs'] = []
     
-# Variabile per il nome del file Excel di output
 if 'filename_output' not in st.session_state:
     st.session_state['filename_output'] = f'Sintesi_Bandi_{datetime.now().strftime("%Y%m%d")}'
 
 # 2. Form per Upload e Aggiunta
 with st.form("pdf_upload_form"):
     
-    st.subheader("Aggiungi i File PDF (Max 5)")
+    st.subheader("Aggiungi i File PDF per l'Analisi (Max 5)")
     
     uploaded_file = st.file_uploader(
         "Carica un file PDF:", 
@@ -220,19 +230,19 @@ with st.form("pdf_upload_form"):
                 'data': uploaded_file.getvalue()
             }
             st.session_state['uploaded_pdfs'].append(file_info)
-            st.success(f"File aggiunto: {uploaded_file.name}. Totale: {len(st.session_state['uploaded_pdfs'])}.")
+            st.success(f"File aggiunto: **{uploaded_file.name}**. Totale: **{len(st.session_state['uploaded_pdfs'])}**.")
         else:
             st.warning("Hai raggiunto il limite massimo di 5 PDF.")
-        st.rerun() # Riavvia per pulire l'uploader
+        st.rerun() 
 
     # Logica di pulizia
     if clear_button:
         st.session_state['uploaded_pdfs'] = []
         st.info("Lista file svuotata.")
-        st.rerun() # Riavvia per pulire lo stato
+        st.rerun() 
 
 # 3. Stato attuale dei file in coda
-st.subheader(f"File in Coda per l'Analisi: {len(st.session_state['uploaded_pdfs'])}/5")
+st.subheader(f"File in Coda: {len(st.session_state['uploaded_pdfs'])}/5")
 if st.session_state['uploaded_pdfs']:
     file_names = [f['name'] for f in st.session_state['uploaded_pdfs']]
     st.markdown("* " + "\n* ".join(file_names))
@@ -244,11 +254,11 @@ st.markdown("---")
 # 4. Esecuzione e Download
 filename_input = st.text_input(
     "Dai un nome al tuo file Excel di output:", 
-    value=st.session_state['filename_output'],
-    key='filename_output_key' # Aggiorna la session_state con il valore
+    value=st.session_state.get('filename_output', f'Sintesi_Bandi_{datetime.now().strftime("%Y%m%d")}'),
+    key='filename_output_key' 
 )
 
-if st.button("▶️ ESTRAI e GENERATE REPORT EXCEL", type="primary", disabled=(len(st.session_state['uploaded_pdfs']) == 0)):
+if st.button("▶️ ESTRAI e GENERA REPORT EXCEL", type="primary", disabled=(len(st.session_state['uploaded_pdfs']) == 0)):
     
     if not st.session_state['uploaded_pdfs']:
         st.error("Carica almeno un file PDF per procedere.")
@@ -256,45 +266,48 @@ if st.button("▶️ ESTRAI e GENERATE REPORT EXCEL", type="primary", disabled=(
         
     risultati_finali = []
     
-    # Inizializza la barra di progresso
     progress_bar = st.progress(0, text=f"Analisi di {len(st.session_state['uploaded_pdfs'])} file PDF in corso...")
     
     for i, file_info in enumerate(st.session_state['uploaded_pdfs']):
         file_name = file_info['name']
         file_bytes = file_info['data']
         
-        progress_text = f"Analisi file {i + 1} di {len(st.session_state['uploaded_pdfs'])}: {file_name}"
+        progress_text = f"Analisi file {i + 1} di {len(st.session_state['uploaded_pdfs'])}: **{file_name}**"
         progress_bar.progress((i + 1) / len(st.session_state['uploaded_pdfs']), text=progress_text)
         
-        # 1. Lettura del PDF dai bytes
         pdf_stream = BytesIO(file_bytes)
         final_text = estrai_testo_da_pdf(pdf_stream)
         
         if final_text:
-            # 2. Estrazione dei dettagli
             risultati_bando = estrai_dettagli_da_testo_grezzo(final_text, file_name)
             risultati_finali.append(risultati_bando)
         else:
-            # Aggiungi un record vuoto se l'estrazione del testo è fallita
-            risultati_falliti = {k: "FALLITO (Testo non leggibile)" for k in risultati_finali[0].keys()} if risultati_finali else {}
+            # Gestione del fallimento (se la lista ha già elementi, usiamo le chiavi del primo)
+            default_keys = list(risultati_finali[0].keys()) if risultati_finali else list(risultati.keys())
+            risultati_falliti = {k: "FALLITO (Testo non leggibile)" for k in default_keys}
             risultati_falliti["Titolo bando"] = file_name
             risultati_finali.append(risultati_falliti)
             
     progress_bar.empty()
     
     if risultati_finali:
-        df_final = pd.DataFrame(risultati_finali)
-        st.success(f"✅ Analisi completata per {len(risultati_finali)} bandi. Ecco il report sintetico:")
+        # Converti in DataFrame e gestisci gli NA come valori vuoti per l'Excel
+        df_final = pd.DataFrame(risultati_finali).replace('NA', '', regex=True)
         
-        # Visualizzazione Tabella
+        # --- SUCCESSO ---
+        try:
+            st.image("success_icon.jpg", width=100) 
+        except FileNotFoundError:
+            st.success(f"✅ Analisi completata per {len(risultati_finali)} bandi.")
+        
         st.dataframe(df_final, use_container_width=True)
         
         # Logica di Download
         output = BytesIO()
+        # Usiamo 'xlsxwriter' che è stato aggiunto ai requisiti
         df_final.to_excel(output, index=False, engine='xlsxwriter') 
         excel_data = output.getvalue() 
         
-        # Prendi il nome del file dall'input (salvato nella session_state)
         nome_file_finale = f'{st.session_state.filename_output_key.replace(" ", "_")}.xlsx' 
 
         st.download_button(
@@ -304,5 +317,8 @@ if st.button("▶️ ESTRAI e GENERATE REPORT EXCEL", type="primary", disabled=(
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     else:
-
+        try:
+            st.image("fail_icon.webp", width=300) 
+        except FileNotFoundError:
+            pass
         st.error("⚠️ Nessun dato è stato estratto correttamente. Controlla i file PDF.")
