@@ -8,7 +8,7 @@ import numpy as np # Importiamo numpy per gestire NaN
 
 # --- CONFIGURAZIONE E STILE ---
 
-st.set_page_config(page_title="📋 Lino Estrattore Multi-Bando", layout="centered")
+st.set_page_config(page_title="📋 Lino Bandi 2 - L'Estrattore", layout="centered")
 
 # --- FUNZIONE DI ANALISI DEL TESTO AVANZATA (CORE DEL BOT) ---
 
@@ -322,4 +322,5 @@ if st.button("▶️ ESTRAI e GENERA REPORT EXCEL", type="primary", disabled=(le
         except FileNotFoundError:
             pass
         st.error("⚠️ Nessun dato è stato estratto correttamente. Controlla i file PDF.")
+
 
