@@ -139,11 +139,11 @@ def estrai_testo_da_pdf(pdf_file_obj):
 
 # LOGO SOPRA IL TITOLO (centrato nel layout compatto)
 try:
-    st.image("amel_logo.png", width=200) 
+    st.image("logo_amel.png", width=200) 
 except FileNotFoundError:
     st.warning("⚠️ Logo 'amel_logo.png' non trovato. Assicurati che sia nella cartella principale.")
 
-st.title("🌱 Lino Bandi l'Aggregatore")
+st.title("📋 Lino Bandi 2 - L'Estrattore")
 
 st.markdown("---")
 
@@ -273,5 +273,6 @@ if st.button("▶️ ESTRAI e GENERA REPORT EXCEL con AI", type="primary", disab
     else:
         # Questo errore significa che NESSUNA chiamata API ha avuto successo.
         st.error("⚠️ Nessun dato è stato estratto con successo. Controlla la chiave API e i log dell'app.")
+
 
 
