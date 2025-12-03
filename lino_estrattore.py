@@ -183,9 +183,9 @@ def estrai_testo_da_pdf(pdf_file_obj):
 
 # --- LOGO E TITOLO ---
 try:
-    st.image("logo_amelia.png", width=200) 
+    st.image("logo_amel.png", width=200) 
 except FileNotFoundError:
-    st.warning("⚠️ Logo 'logo_amelia.png' non trovato. Assicurati che sia nella cartella principale.")
+    st.warning("⚠️ Logo 'logo_amel.png' non trovato. Assicurati che sia nella cartella principale.")
 
 st.title("📋 Lino Estrattore Multi-Bando")
 st.markdown("---")
@@ -322,3 +322,4 @@ if st.button("▶️ ESTRAI e GENERA REPORT EXCEL", type="primary", disabled=(le
         except FileNotFoundError:
             pass
         st.error("⚠️ Nessun dato è stato estratto correttamente. Controlla i file PDF.")
+
