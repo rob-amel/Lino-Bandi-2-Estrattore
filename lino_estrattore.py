@@ -133,19 +133,17 @@ def estrai_testo_da_pdf(pdf_file_obj):
 # --------------------- INTERFACCIA STREAMLIT (Frontend) ---------------
 # ----------------------------------------------------------------------
 
-# --- LOGO E TITOLO ALLINEATI A SINISTRA ---
+# ----------------------------------------------------
+# 1. LOGO E TITOLO
+# ----------------------------------------------------
 
-col_logo, col_title = st.columns([1.5, 5]) 
+# LOGO SOPRA IL TITOLO (centrato nel layout compatto)
+try:
+    st.image("amel_logo.png", width=200) 
+except FileNotFoundError:
+    st.warning("⚠️ Logo 'amel_logo.png' non trovato. Assicurati che sia nella cartella principale.")
 
-with col_logo:
-    try:
-        st.image("logo_amel.png", width=100) 
-    except FileNotFoundError:
-        pass # Lasciamo il logo mancante, ma il resto funziona
-
-with col_title:
-    # CORREZIONE TITOLO: come richiesto
-    st.title("📋 Lino Bandi 2 - L'Estrattore")
+st.title("🌱 Lino Bandi l'Aggregatore")
 
 st.markdown("---")
 
@@ -275,4 +273,5 @@ if st.button("▶️ ESTRAI e GENERA REPORT EXCEL con AI", type="primary", disab
     else:
         # Questo errore significa che NESSUNA chiamata API ha avuto successo.
         st.error("⚠️ Nessun dato è stato estratto con successo. Controlla la chiave API e i log dell'app.")
+
 
